@@ -7,7 +7,8 @@ use File::Kvpar;
 use File::Kit;
 use File::Feed::Channel;
 use File::Feed::Source;
-use File::Basename qw(basename);
+use File::Path qw(mkpath);
+use File::Basename qw(basename dirname);
 
 use vars qw($VERSION);
 
@@ -61,13 +62,20 @@ sub fill {
         my %logged = map { $_->{'to'} => $_ } $self->files;
         $source->begin($self);
         foreach my $chan (@chan) {
-            my ($from_dir, $to_dir, $filter, $recursive) = ($chan->from, $chan->to, $chan->filter, $chan->recursive);
+            my ($from_dir, $to_dir, $filter, $recursive, $autodir) = ($chan->from, $chan->to, $chan->filter, $chan->recursive, $chan->autodir);
             foreach ($source->list($from_dir, $recursive)) {
                 (my $path = $_) =~ s{^$from_dir/}{};
                 my ($from, $to) = ($_, "$to_dir/$path");
                 next if !$filter->($path);
                 next if $logged{$to};
-                if ($source->fetch($from, "$dir/files/$to")) {
+                my $dest = "$dir/files/$to";
+                my $dest_dir = dirname($dest);
+                if (! -d) {
+                    die "Destination directory $dest_dir does not exist"
+                        if !$autodir;
+                    mkpath($dest_dir);
+                }
+                if ($source->fetch($from, $dest)) {
                     push @files, File::Feed::File->new(
                         '#'       => $from,
                         'feed'    => $self->id,
