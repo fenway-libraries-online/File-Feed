@@ -5,5 +5,7 @@ use warnings;
 
 use File::Feed;
 
-my $feed = File::Feed->new('example');
-$feed->fill;
+foreach (@ARGV) {
+    my $feed = File::Feed->new($_);
+    $feed->fill;
+}
