@@ -1,0 +1,9 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Feed;
+
+my $feed = File::Feed->new('example');
+$feed->fill;
