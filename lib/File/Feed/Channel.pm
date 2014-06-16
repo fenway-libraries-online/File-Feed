@@ -11,9 +11,10 @@ sub new {
 }
 
 sub id { $_[0]->{'#'} }
-sub from { $_[0]->{'from'} }
-sub to { $_[0]->{'to'} }
+sub from { $_[0]->{'from'} || $_[0]->{'in'} || $_[0]->{'#'} }
+sub to { $_[0]->{'to'} || $_[0]->{'in'} || $_[0]->{'#'} }
 sub recursive { $_[0]->{'recursive'} }
+sub autodir { $_[0]->{'autodir'} }
 sub description { $_[0]->{'description'} }
 
 sub filter {
