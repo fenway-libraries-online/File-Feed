@@ -70,7 +70,7 @@ sub fill {
                 next if $logged{$to};
                 my $dest = "$dir/files/$to";
                 my $dest_dir = dirname($dest);
-                if (! -d) {
+                if (! -d $dest_dir) {
                     die "Destination directory $dest_dir does not exist"
                         if !$autodir;
                     mkpath($dest_dir);
