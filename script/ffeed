@@ -28,7 +28,6 @@ usage: ffeed COMMAND [ARG...]
 commands:
     fill FEED [CHANNEL...]      Fill (a) feed(s) with new files
     drain FEED                  Process new files
-
 EOS
     exit 1;
 }
