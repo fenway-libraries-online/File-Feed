@@ -8,6 +8,7 @@ use File::Feed::File;
 use base 'File::Feed::Source';
 
 use Net::FTP;
+use Net::Netrc;
 
 sub protocol { 'ftp' }
 
