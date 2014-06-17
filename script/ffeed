@@ -5,7 +5,30 @@ use warnings;
 
 use File::Feed;
 
-foreach (@ARGV) {
-    my $feed = File::Feed->new($_);
-    $feed->fill;
+my $verbose;
+
+usage() if !@ARGV;
+
+my $cmd = shift;
+my $code = __PACKAGE__->can("cmd_$cmd") or usage();
+$code->();
+
+sub cmd_fill {
+    usage() if @ARGV < 1;
+    my $feed = File::Feed->new(shift @ARGV);
+    foreach my $f ($feed->fill(@ARGV)) {
+        my ($from, $to) = ($f->from, $f->to);
+        print $verbose ? "$to <= $from\n" : "$to\n";
+    }
+}
+
+sub usage {
+    print STDERR <<'EOS';
+usage: ffeed COMMAND [ARG...]
+commands:
+    fill FEED [CHANNEL...]      Fill (a) feed(s) with new files
+    drain FEED                  Process new files
+
+EOS
+    exit 1;
 }
