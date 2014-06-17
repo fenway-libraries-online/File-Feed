@@ -4,8 +4,8 @@ use strict;
 use warnings;
 
 use File::Feed;
-
-my $verbose;
+use File::Kvpar;
+use Getopt::Std;
 
 usage() if !@ARGV;
 
@@ -14,11 +14,19 @@ my $code = __PACKAGE__->can("cmd_$cmd") or usage();
 $code->();
 
 sub cmd_fill {
+    my %opt;
+    getopts('mv', \%opt);
     usage() if @ARGV < 1;
     my $feed = File::Feed->new(shift @ARGV);
-    foreach my $f ($feed->fill(@ARGV)) {
-        my ($from, $to) = ($f->from, $f->to);
-        print $verbose ? "$to <= $from\n" : "$to\n";
+    my @new = $feed->fill(@ARGV);
+    if ($opt{'m'}) {
+        File::Kvpar->new(\*STDOUT)->write(@new);
+    }
+    elsif ($opt{'v'}) {
+        printf "%s <= %s\n", $_->to, $_->from for @new;
+    }
+    else {
+        print $_->to, "\n" for @new;
     }
 }
 
