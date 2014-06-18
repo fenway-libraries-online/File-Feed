@@ -33,9 +33,9 @@ sub cmd_fill {
 sub cmd_drain {
     my %opt;
     getopts('nv', \%opt);
-    usage() if @ARGV < 1;
+    usage() if @ARGV != 2;
     my $feed = File::Feed->new(shift @ARGV);
-    $feed->drain;
+    $feed->drain(@ARGV);
 }
 
 sub usage {

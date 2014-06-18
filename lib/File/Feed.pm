@@ -128,11 +128,11 @@ sub full {
 
 sub drain {
     my ($self, $dest_root) = @_;
-    my $old_status;
+    die "No destination for drain" if !defined $dest_root;
     my @new = $self->full;
     return if !@new;
-    my @shadow;
     my $autodir = $self->autodir;
+    my $old_status;
     my $ok = eval {
         $old_status = $self->status(DRAINING);
         if (defined $old_status) {
