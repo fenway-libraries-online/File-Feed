@@ -132,6 +132,7 @@ sub drain {
     my @new = $self->full;
     return if !@new;
     my @shadow;
+    my $autodir = $self->autodir;
     my $ok = eval {
         $old_status = $self->status(DRAINING);
         if (defined $old_status) {
