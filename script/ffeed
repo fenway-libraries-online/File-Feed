@@ -33,7 +33,7 @@ sub cmd_fill {
 sub cmd_new {
     my $feed = File::Feed->new(shift @ARGV);
     my @new = $feed->new_files;
-    print $_->path, "\n" for @new;
+    print $_->to, "\n" for @new;
 }
 
 sub cmd_drain {

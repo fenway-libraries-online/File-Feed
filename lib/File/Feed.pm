@@ -131,7 +131,7 @@ sub new_files {
     _crawl($new_dir, \@files);
     s{^$new_dir/}{} for @files;
     my %want = map { $_ => 1 } @files;
-    return map { File::Feed::File->new(%$_) } grep { $want{$_->{'#'}} } $self->files;
+    return map { File::Feed::File->new(%$_) } grep { $want{$_->{'to'} || $_->{'#'}} } $self->files;
 }
 
 sub _crawl {
