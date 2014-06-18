@@ -15,11 +15,12 @@ use vars qw($VERSION);
 $VERSION = '0.02';
 
 # Feed statuses
-use constant EMPTY   => '@empty';
-use constant FILLING => '@filling';
-use constant FULL    => '@full';
-use constant ERROR   => '@error';
-use constant FROZEN  => '@frozen';
+use constant EMPTY    => '@empty';
+use constant FILLING  => '@filling';
+use constant DRAINING => '@draining';
+use constant FULL     => '@full';
+use constant ERROR    => '@error';
+use constant FROZEN   => '@frozen';
 
 sub new {
     my ($cls, $dir) = @_;
@@ -79,7 +80,7 @@ sub fill {
                     my $dest_dir = dirname($dest);
                     my $arch_dir = dirname($arch);
                     if ($clobber) {
-                        push @shadow, $self->shadow($arch) if -e $arch;
+                        $self->_shadow($arch) if -e $arch;
                         unlink $arch;
                     }
                     elsif (-e $arch) {
@@ -108,10 +109,6 @@ sub fill {
             }
             $source->end;
             $self->{'_fileskv'}->append(@files);
-            foreach (@shadow) {
-                my ($shadow, $original) = @$_;
-                unlink $shadow or link($shadow, $original) or die "Can't remove shadow file $shadow or relink it to $original: $!";
-            }
         }
         1;
     };
@@ -120,9 +117,51 @@ sub fill {
     }
     else {
         $self->status(ERROR) if !defined($old_status) || $old_status ne ERROR;
-        die "Fill failed: $@\n";
     }
+    $self->_cleanup;
+    die "Fill failed: $@\n" if !$ok;
     return @files;
+}
+
+sub full {
+}
+
+sub drain {
+    my ($self, $dest_root) = @_;
+    my $old_status;
+    my @new = $self->full;
+    return if !@new;
+    my @shadow;
+    my $ok = eval {
+        $old_status = $self->status(DRAINING);
+        if (defined $old_status) {
+            die "Feed is in error state" if $old_status eq ERROR;
+            my $dir  = $self->dir;
+            if (! -d $dest_root) {
+                die "Destination directory $dest_root does not exist"
+                    if !$autodir;
+                mkpath($dest_root);
+            }
+            my %dir;
+            foreach my $file (@new) {
+                my $path = $file->path;
+                my ($new, $dest) = ("$dir/new/$path", "$dest_root/$path");
+                my $dest_dir = dirname($dest);
+                mkpath($dest_dir) if ! $dir{$dest_dir}++ && ! -d $dest_dir;
+                $self->_shadow($new);
+                move($new, $dest) or die "Can't copy $path to $dest_dir: $!";
+            }
+        }
+        1;
+    };
+    if ($ok) {
+        $self->status(EMPTY);
+    }
+    else {
+        $self->status(ERROR) if !defined($old_status) || $old_status ne ERROR;
+    }
+    $self->_cleanup;
+    die "Fill failed: $@\n" if !$ok;
 }
 
 sub assemble {
@@ -174,16 +213,27 @@ sub files {
     return $self->{'_fileskv'}->elements;
 }
 
-sub shadow {
+sub _shadow {
     my ($self, $file) = @_;
-    my $dir = $self->dir . '/tmp';
+    my $dir = $self->dir . '/shadow';
     my $n = 4;
-    my $rand;
-    while (defined($rand = $self->_random_hex(8)) && !link $file, "$dir/shadow.$rand") {
-        die "Can't create shadow file $rand for $file: $!"
+    my ($rand, $shadow);
+    -d $dir or mkdir $dir or die "Can't mkdir $dir $!";
+    while (defined($rand = $self->_random_hex(8)) && !link $file, $shadow = "$dir/shadow.$rand") {
+        die "Can't create shadow file $shadow for $file: $!"
             if --$n == 0;
     }
-    return [ "$dir/$rand", $file ];
+    push @{ $self->{'_shadow'} ||= [] }, [ $shadow, $file ];
+    return $shadow, $file;
+}
+
+sub _cleanup {
+    my ($self) = @_;
+    my $shadow = $self->{'_shadow'};
+    foreach (@$shadow) {
+        my ($shadow, $original) = @$_;
+        unlink $shadow or link($shadow, $original) or die "Can't remove shadow file $shadow or relink it to $original: $!";
+    }
 }
 
 sub _fill_random_buffer {
