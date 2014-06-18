@@ -30,6 +30,14 @@ sub cmd_fill {
     }
 }
 
+sub cmd_drain {
+    my %opt;
+    getopts('nv', \%opt);
+    usage() if @ARGV < 1;
+    my $feed = File::Feed->new(shift @ARGV);
+    $feed->drain;
+}
+
 sub usage {
     print STDERR <<'EOS';
 usage: ffeed COMMAND [ARG...]
