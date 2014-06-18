@@ -8,6 +8,7 @@ use File::Kit;
 use File::Feed::Channel;
 use File::Feed::Source;
 use File::Path qw(mkpath);
+use File::Copy qw(move copy);
 use File::Basename qw(basename dirname);
 
 use vars qw($VERSION);
@@ -123,13 +124,36 @@ sub fill {
     return @files;
 }
 
-sub full {
+sub new_files {
+    my ($self) = @_;
+    my @files;
+    my $new_dir = $self->dir . '/new';
+    _crawl($new_dir, \@files);
+    s{^$new_dir/}{} for @files;
+    my %want = map { $_ => 1 } @files;
+    return map { File::Feed::File->new(%$_) } grep { $want{$_->{'#'}} } $self->files;
+}
+
+sub _crawl {
+    my ($dir, $list) = @_;
+    opendir my $fh, $dir or die;
+    my @files = grep { !/^\./ } readdir($fh);
+    closedir $fh;
+    foreach my $name (@files) {
+        my $path = "$dir/$name";
+        if (-d $path) {
+            _crawl($path, $list);
+        }
+        elsif (-f _) {
+            push @$list, $path;
+        }
+    }
 }
 
 sub drain {
     my ($self, $dest_root) = @_;
     die "No destination for drain" if !defined $dest_root;
-    my @new = $self->full;
+    my @new = $self->new_files;
     return if !@new;
     my $autodir = $self->autodir;
     my $old_status;
@@ -150,7 +174,7 @@ sub drain {
                 my $dest_dir = dirname($dest);
                 mkpath($dest_dir) if ! $dir{$dest_dir}++ && ! -d $dest_dir;
                 $self->_shadow($new);
-                move($new, $dest) or die "Can't copy $path to $dest_dir: $!";
+                move($new, $dest) or die "Can't move $path to $dest_dir: $!";
             }
         }
         1;
