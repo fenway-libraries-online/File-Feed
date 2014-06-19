@@ -16,10 +16,9 @@ use vars qw($VERSION);
 $VERSION = '0.02';
 
 # Feed statuses
-use constant EMPTY    => '@empty';
+use constant IDLE     => '@idle';
 use constant FILLING  => '@filling';
 use constant DRAINING => '@draining';
-use constant FULL     => '@full';
 use constant ERROR    => '@error';
 use constant FROZEN   => '@frozen';
 
@@ -60,78 +59,96 @@ sub fill {
         @chan = $self->channels;
     }
     my $source = $self->source;
-    my ($old_status, @shadow);
     my $ok = eval {
-        $old_status = $self->status(FILLING);
-        if (defined $old_status) {
-            die "Feed is in error state" if $old_status eq ERROR;
-            my $dir  = $self->dir;
-            my %logged = map { $_->{'to'} => $_ } $self->files;
-            $source->begin($self);
-            foreach my $chan (@chan) {
-                my ($from_dir, $to_dir, $filter, $recursive, $autodir, $repeat, $clobber) = ($chan->from, $chan->to, $chan->filter, $chan->recursive, $chan->autodir, $chan->repeat || $self->repeat, $chan->clobber || $self->clobber);
-                foreach ($source->list($from_dir, $recursive)) {
-                    (my $path = $_) =~ s{^$from_dir/}{};
-                    my ($from, $to) = ($_, "$to_dir/$path");
-                    next if !$filter->($path);
-                    my $replace;
-                    next if $logged{$to} && ! $repeat;
-                    my $arch = "$dir/archive/$to";
-                    my $dest = "$dir/new/$to";
-                    my $dest_dir = dirname($dest);
-                    my $arch_dir = dirname($arch);
-                    if ($clobber) {
-                        $self->_shadow($arch) if -e $arch;
-                        unlink $arch;
-                    }
-                    elsif (-e $arch) {
-                        die "File $to would clobber $arch";
-                    }
-                    else {
-                        mkpath $arch_dir if ! -d $arch_dir;
-                    }
-                    if (! -d $dest_dir) {
-                        die "Destination directory $dest_dir does not exist"
-                            if !$autodir;
-                        mkpath($dest_dir);
-                    }
-                    if ($source->fetch($from, $dest)) {
-                        link $dest, $arch or die;
-                        push @files, File::Feed::File->new(
-                            '#'       => $from,
-                            'feed'    => $self->id,
-                            'source'  => $source->uri,
-                            'channel' => $chan->id,
-                            'from'    => $from,
-                            'to'      => $to,
-                        )
-                    }
+        $self->status(FILLING) or die "Can't set status: not a feed?";
+        my %logged = map { $_->{'to'} => $_ } $self->files;
+        $source->begin($self);
+        foreach my $chan (@chan) {
+            my ($from_dir, $to_dir, $filter, $recursive, $autodir)
+                = ($chan->from, $chan->to, $chan->filter, $chan->recursive, $chan->autodir);
+            my ($repeat, $clobber)
+                = ($chan->repeat || $self->repeat, $chan->clobber || $self->clobber);
+            foreach ($source->list($from_dir, $recursive)) {
+                (my $path = $_) =~ s{^$from_dir/}{};
+                my ($from, $to) = ($_, "$to_dir/$path");
+                next if !$filter->($path);
+                my $replace;
+                next if $logged{$to} && ! $repeat;
+                my $arch = $self->path('archive', $to);
+                my $dest = $self->path('new',     $to);
+                my $dest_dir = dirname($dest);
+                my $arch_dir = dirname($arch);
+                if ($clobber) {
+                    $self->_shadow($arch) if -e $arch;
+                    unlink $arch;
+                }
+                elsif (-e $arch) {
+                    die "File $to would clobber $arch";
+                }
+                else {
+                    mkpath $arch_dir if ! -d $arch_dir;
+                }
+                if (! -d $dest_dir) {
+                    die "Destination directory $dest_dir does not exist"
+                        if !$autodir;
+                    mkpath($dest_dir);
+                }
+                if ($source->fetch($from, $dest)) {
+                    link $dest, $arch or die;
+                    push @files, File::Feed::File->new(
+                        '#'       => $from,
+                        'feed'    => $self->id,
+                        'source'  => $source->uri,
+                        'channel' => $chan->id,
+                        'from'    => $from,
+                        'to'      => $to,
+                    )
                 }
             }
-            $source->end;
-            $self->{'_fileskv'}->append(@files);
         }
+        $source->end;
+        $self->{'_fileskv'}->append(@files);
         1;
     };
-    if ($ok) {
-        $self->status($old_status eq FULL ? FULL : @files ? FULL : EMPTY);
-    }
-    else {
-        $self->status(ERROR) if !defined($old_status) || $old_status ne ERROR;
-    }
     $self->_cleanup;
+    $self->status($ok ? IDLE : ERROR);
     die "Fill failed: $@\n" if !$ok;
     return @files;
 }
 
 sub new_files {
-    my ($self) = @_;
+    my $self = shift;
+    my $filter = $self->_filter(@_);
     my @files;
-    my $new_dir = $self->dir . '/new';
+    my $new_dir = $self->path('new');
     _crawl($new_dir, \@files);
     s{^$new_dir/}{} for @files;
     my %want = map { $_ => 1 } @files;
-    return map { File::Feed::File->new(%$_) } grep { $want{$_->{'to'} || $_->{'#'}} } $self->files;
+    return map  { File::Feed::File->new(%$_) }
+           grep { $want{$_->path} && $filter->($_) }
+           $self->files;
+}
+
+sub _filter {
+    my ($self, %arg) = @_;
+    return sub { 1 } if !%arg;
+    my @tests;
+    if (defined(my $chan = delete $arg{'channels'})) {
+        my $r = ref $chan;
+        my %chan = $r eq 'ARRAY'  ? map { $_ => 1 } @$chan
+                 : $r eq 'HASH'   ? %$chan
+                 : $r eq 'Regexp' ? map { $_ => 1 } grep { $_->id =~ $chan } $self->channels
+                 : die "Invalid filter type ($r)"
+                 ;
+        push @tests, sub { $chan{ shift()->channel->id } };
+    }
+    return sub {
+        my ($file) = @_;
+        foreach (@tests) {
+            return if !$_->($file);
+        }
+        return 1;
+    }
 }
 
 sub _crawl {
@@ -151,49 +168,57 @@ sub _crawl {
 }
 
 sub drain {
-    my ($self, $dest_root) = @_;
-    die "No destination for drain" if !defined $dest_root;
-    my @new = $self->new_files;
+    my $self = shift;
+    unshift @_, 'to' if @_ % 2;
+    my %arg = @_;
+    my $to = delete $arg{'to'}
+        or die "No destination for drain";
+    my @new = $self->new_files(%arg);
     return if !@new;
     my $autodir = $self->autodir;
-    my $old_status;
     my $ok = eval {
-        $old_status = $self->status(DRAINING);
-        if (defined $old_status) {
-            die "Feed is in error state" if $old_status eq ERROR;
-            my $dir  = $self->dir;
-            if (! -d $dest_root) {
-                die "Destination directory $dest_root does not exist"
-                    if !$autodir;
-                mkpath($dest_root);
+        $self->status(DRAINING) or die "Can't set status: not a feed?";
+        my $r = ref $to;
+        if ($r eq '') {
+            if (! -d $to) {
+                die "Destination directory $to does not exist"
+                    if !$arg{'autodir'};
+                mkpath($to);
             }
-            my %dir;
+            my %have_dir;
             foreach my $file (@new) {
                 my $path = $file->path;
-                my ($new, $dest) = ("$dir/new/$path", "$dest_root/$path");
+                my ($new, $dest) = ($self->path('new', $path), "$to/$path");
                 my $dest_dir = dirname($dest);
-                mkpath($dest_dir) if ! $dir{$dest_dir}++ && ! -d $dest_dir;
+                mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && ! -d $dest_dir;
                 $self->_shadow($new);
                 move($new, $dest) or die "Can't move $path to $dest_dir: $!";
             }
         }
+        elsif ($r eq 'CODE') {
+            foreach my $file (@new) {
+                $self->_shadow($self->path('new', $file->path));
+                $to->($file);
+            }
+        }
         1;
     };
-    if ($ok) {
-        $self->status(EMPTY);
-    }
-    else {
-        $self->status(ERROR) if !defined($old_status) || $old_status ne ERROR;
-    }
     $self->_cleanup;
+    $self->status($ok ? IDLE : ERROR);
     die "Fill failed: $@\n" if !$ok;
+}
+
+sub path {
+    my $self = shift;
+    return join '/', $self->dir, @_;
 }
 
 sub assemble {
     my $self = shift;
     my $dir = $self->dir;
-    if (-x "$dir/bin/assemble") {
-        system("$dir/bin/assemble", @_);
+    my $asm = $self->path('bin', 'assemble');
+    if (-x $asm) {
+        system($asm, @_);
     }
     else {
         foreach (@_) {
@@ -204,17 +229,18 @@ sub assemble {
 }
 
 sub status {
-    my ($self, $status) = @_;
+    my ($self, $new_status, $error_ok) = @_;
     my $dir = $self->dir;
-    my @cur_status = map { basename($_) } glob("$dir/\@*");
-    die "No status set for feed $self->{'@'}" if !@cur_status;
-    die "Multiple statuses set for feed $self->{'@'}" if @cur_status > 1;
-    return $cur_status[0] if !defined $status;
-    die "Feed is frozen" if $cur_status[0] eq FROZEN;
-    return $status if $cur_status[0] eq $status;
-    rename "$dir/$cur_status[0]", "$dir/$status"
+    my ($old_status, @etc) = map { basename($_) } glob($self->path('@*'));
+    die "No status set for feed $self->{'@'}" if !defined $old_status;
+    die "Multiple statuses set for feed $self->{'@'}" if @etc;
+    return $old_status if !defined $new_status;
+    die "Feed is frozen" if $old_status eq FROZEN;
+    die "Feed is in error state" if $old_status eq ERROR && !$error_ok;
+    return $new_status if $old_status eq $new_status;
+    rename $self->path($old_status), $self->path($new_status)
         or die "Can't set status for feed $self->{'@'}: $!";
-    return $cur_status[0];
+    return $old_status;
 }
 
 sub id          { $_[0]->{'#'}           }
@@ -234,17 +260,16 @@ sub channels    { @{ $_[0]->{'_channels'} } }
 
 sub files {
     my ($self) = @_;
-    my $dir = $self->dir;
     return $self->{'_fileskv'}->elements;
 }
 
 sub _shadow {
     my ($self, $file) = @_;
-    my $dir = $self->dir . '/shadow';
+    my $dir = $self->path('shadow');
     my $n = 4;
     my ($rand, $shadow);
     -d $dir or mkdir $dir or die "Can't mkdir $dir $!";
-    while (defined($rand = $self->_random_hex(8)) && !link $file, $shadow = "$dir/shadow.$rand") {
+    while (defined($rand = $self->_random_hex(8)) && !link $file, $shadow = $self->path($dir, "shadow.$rand")) {
         die "Can't create shadow file $shadow for $file: $!"
             if --$n == 0;
     }
