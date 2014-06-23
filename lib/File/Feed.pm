@@ -191,6 +191,10 @@ sub drain {
                 my ($new, $dest) = ($self->path('new', $path), "$to/$path");
                 my $dest_dir = dirname($dest);
                 mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && ! -d $dest_dir;
+                if (-e $new) {
+                    print STDERR "File $new already exists\n";
+                    next;
+                }
                 $self->_shadow($new);
                 move($new, $dest) or die "Can't move $path to $dest_dir: $!";
             }
@@ -265,11 +269,11 @@ sub files {
 
 sub _shadow {
     my ($self, $file) = @_;
-    my $dir = $self->path('shadow');
     my $n = 4;
     my ($rand, $shadow);
+    my $dir = $self->path('shadow');
     -d $dir or mkdir $dir or die "Can't mkdir $dir $!";
-    while (defined($rand = $self->_random_hex(8)) && !link $file, $shadow = $self->path($dir, "shadow.$rand")) {
+    while (defined($rand = $self->_random_hex(8)) && !link $file, $shadow = $self->path('shadow', "shadow.$rand")) {
         die "Can't create shadow file $shadow for $file: $!"
             if --$n == 0;
     }
