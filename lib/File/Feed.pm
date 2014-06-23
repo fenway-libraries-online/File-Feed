@@ -125,7 +125,7 @@ sub new_files {
     s{^$new_dir/}{} for @files;
     my %want = map { $_ => 1 } @files;
     return map  { File::Feed::File->new(%$_) }
-           grep { $want{$_->path} && $filter->($_) }
+           grep { $want{$_->{'to'}} && $filter->($_) }
            $self->files;
 }
 
