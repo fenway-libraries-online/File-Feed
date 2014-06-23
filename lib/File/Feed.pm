@@ -119,8 +119,8 @@ sub fill {
 sub new_files {
     my $self = shift;
     my $filter = $self->_filter(@_);
-    my @files;
     my $new_dir = $self->path('new');
+    my @files;
     _crawl($new_dir, \@files);
     s{^$new_dir/}{} for @files;
     my %want = map { $_ => 1 } @files;

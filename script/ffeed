@@ -5,7 +5,8 @@ use warnings;
 
 use File::Feed;
 use File::Kvpar;
-use Getopt::Std;
+use Getopt::Long
+    qw(:config posix_default gnu_compat require_order bundling no_ignore_case);
 
 usage() if !@ARGV;
 
@@ -15,8 +16,7 @@ $code->();
 
 sub cmd_fill {
     my %opt;
-    getopts('mv', \%opt);
-    usage() if @ARGV < 1;
+    GetOptions(\%opt, qw(m v)) && @ARGV or usage();
     my $feed = File::Feed->new(shift @ARGV);
     my @new = $feed->fill(@ARGV);
     if ($opt{'m'}) {
@@ -31,25 +31,30 @@ sub cmd_fill {
 }
 
 sub cmd_new {
+    usage() if @ARGV < 1;
     my $feed = File::Feed->new(shift @ARGV);
-    my @new = $feed->new_files;
+    my %filter;
+    $filter{'channels'} = [@_] if @_;
+    my @new = $feed->new_files(%filter);
     print $_->to, "\n" for @new;
 }
 
 sub cmd_drain {
-    my %opt;
-    getopts('nv', \%opt);
-    usage() if @ARGV != 2;
+    usage() if @ARGV < 2;
     my $feed = File::Feed->new(shift @ARGV);
-    $feed->drain(@ARGV);
+    my $dir = shift @ARGV;
+    my %filter;
+    $filter{'channels'} = [@_] if @_;
+    $feed->drain('to' => $dir, %filter);
 }
 
 sub usage {
     print STDERR <<'EOS';
 usage: ffeed COMMAND [ARG...]
 commands:
-    fill FEED [CHANNEL...]      Fill (a) feed(s) with new files
-    drain FEED                  Process new files
+    fill  FEED [CHANNEL...]        Fill a feed with new files
+    new   FEED [CHANNEL...]        List new files in a feed
+    drain FEED DIR [CHANNEL...]    Move new files to DIR
 EOS
     exit 1;
 }
