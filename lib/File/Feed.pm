@@ -187,7 +187,7 @@ sub drain {
             }
             my %have_dir;
             foreach my $file (@new) {
-                my $path = $file->path;
+                my $path = $file->to;
                 my ($new, $dest) = ($self->path('new', $path), "$to/$path");
                 my $dest_dir = dirname($dest);
                 mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && ! -d $dest_dir;
