@@ -34,7 +34,7 @@ sub cmd_new {
     usage() if @ARGV < 1;
     my $feed = File::Feed->new(shift @ARGV);
     my %filter;
-    $filter{'channels'} = [@_] if @_;
+    $filter{'channels'} = [@ARGV] if @ARGV;
     my @new = $feed->new_files(%filter);
     print $_->to, "\n" for @new;
 }
@@ -44,7 +44,7 @@ sub cmd_drain {
     my $feed = File::Feed->new(shift @ARGV);
     my $dir = shift @ARGV;
     my %filter;
-    $filter{'channels'} = [@_] if @_;
+    $filter{'channels'} = [@ARGV] if @ARGV;
     $feed->drain('to' => $dir, %filter);
 }
 
