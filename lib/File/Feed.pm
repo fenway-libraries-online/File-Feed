@@ -140,7 +140,7 @@ sub _filter {
                  : $r eq 'Regexp' ? map { $_ => 1 } grep { $_->id =~ $chan } $self->channels
                  : die "Invalid filter type ($r)"
                  ;
-        push @tests, sub { $chan{ shift()->channel->id } };
+        push @tests, sub { $chan{ shift()->{'channel'} } };
     }
     return sub {
         my ($file) = @_;
