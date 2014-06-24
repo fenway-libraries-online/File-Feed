@@ -190,10 +190,16 @@ sub drain {
                 my $path = $file->to;
                 my ($new, $dest) = ($self->path('new', $path), "$to/$path");
                 my $dest_dir = dirname($dest);
-                mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && ! -d $dest_dir;
-                if (-e $new) {
-                    print STDERR "File $new already exists\n";
-                    next;
+                mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && !-d $dest_dir;
+                if (-e $dest) {
+                    if (-s _ == -s $new) {
+                        print STDERR "File $dest exists with same size, deleting it";
+                        unlink $dest;
+                    }
+                    else {
+                        print STDERR "File $dest exists with different size, skipping $new\n";
+                        next;
+                    }
                 }
                 $self->_shadow($new);
                 move($new, $dest) or die "Can't move $path to $dest_dir: $!";
@@ -256,7 +262,7 @@ sub description { $_[0]->{'description'} }
 sub user        { $_[0]->{'user'}        }
 sub autodir     { $_[0]->{'autodir'}     }
 sub repeat      { $_[0]->{'repeat'}      }
-sub clobber   { $_[0]->{'clobber'}   }
+sub clobber     { $_[0]->{'clobber'}   }
 
 sub dir         { $_[0]->{'_dir'}        }
 sub source      { $_[0]->{'_source'}     }
