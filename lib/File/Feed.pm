@@ -173,6 +173,7 @@ sub drain {
     my %arg = @_;
     my $to = delete $arg{'to'}
         or die "No destination for drain";
+    my $strip = $arg{'strip_leading_components'};
     my @new = $self->new_files(%arg);
     return if !@new;
     my $autodir = $self->autodir;
@@ -187,8 +188,12 @@ sub drain {
             }
             my %have_dir;
             foreach my $file (@new) {
-                my $path = $file->to;
-                my ($new, $dest) = ($self->path('new', $path), "$to/$path");
+                my $path = my $dest_path = $file->to;
+                if ($strip) {
+                    my $n = $strip;
+                    $dest_path =~ s{^[^/]+/}{} while $n--;
+                }
+                my ($new, $dest) = ($self->path('new', $path), "$to/$dest_path");
                 my $dest_dir = dirname($dest);
                 mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && !-d $dest_dir;
                 if (-e $dest) {

@@ -40,11 +40,13 @@ sub cmd_new {
 }
 
 sub cmd_drain {
-    usage() if @ARGV < 2;
+    my %opt;
+    GetOptions(\%opt, 'p=i') && @ARGV > 1 or usage();
     my $feed = File::Feed->new(shift @ARGV);
     my $dir = shift @ARGV;
     my %filter;
     $filter{'channels'} = [@ARGV] if @ARGV;
+    $filter{'strip_leading_components'} = $opt{'p'} if $opt{'p'};
     $feed->drain('to' => $dir, %filter);
 }
 
