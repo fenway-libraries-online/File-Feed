@@ -21,7 +21,7 @@ sub autodir { exists $_[0]->{'autodir'} ? $_[0]->{'autodir'} : $_[0]->{'_feed'}-
 sub repeat  { exists $_[0]->{'repeat' } ? $_[0]->{'repeat' } : $_[0]->{'_feed'}->repeat  }
 sub clobber { exists $_[0]->{'clobber'} ? $_[0]->{'clobber'} : $_[0]->{'_feed'}->clobber }
 
-sub filter {
+sub file_filter {
     my ($self) = @_;
     return $self->{'_filter'} if $self->{'_filter'};
     my $spec = $self->{'filter'} or return $self->{'_filter'} = sub { 1 };

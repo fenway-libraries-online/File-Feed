@@ -51,14 +51,8 @@ sub new {
 
 sub fill {
     my $self = shift;
-    my (@chan, @files);
-    if (@_) {
-        my %want = map { $_ => 1 } @_;
-        @chan = grep { $want{$_->id} } $self->channels;
-    }
-    else {
-        @chan = $self->channels;
-    }
+    my @files;
+    my @chan = $self->channels(@_);
     my $source = $self->source;
     my $ok = eval {
         $self->status(FILLING) or die "Can't set status: not a feed?";
@@ -66,7 +60,7 @@ sub fill {
         $source->begin($self);
         foreach my $chan (@chan) {
             my ($from_dir, $to_dir, $filter, $recursive, $autodir)
-                = ($chan->from, $chan->to, $chan->filter, $chan->recursive, $chan->autodir);
+                = ($chan->from, $chan->to, $chan->file_filter, $chan->recursive, $chan->autodir);
             my ($repeat, $clobber)
                 = ($chan->repeat || $self->repeat, $chan->clobber || $self->clobber);
             foreach ($source->list($from_dir, $recursive)) {
@@ -139,7 +133,7 @@ sub _kit_instance {
 
 sub new_files {
     my $self = shift;
-    my $filter = $self->_filter(@_);
+    my $filter = $self->_channel_filter(@_);
     my $new_dir = $self->path('new');
     my @files;
     _crawl($new_dir, \@files);
@@ -150,7 +144,7 @@ sub new_files {
            $self->files;
 }
 
-sub _filter {
+sub _channel_filter {
     my ($self, %arg) = @_;
     return sub { 1 } if !%arg;
     my @tests;
@@ -195,6 +189,7 @@ sub drain {
     my $to = delete $arg{'to'}
         or die "No destination for drain";
     my $strip = $arg{'strip_leading_components'};
+    my %want = map { $_ => 1 } $self->channels( @{ $arg{'channels'} || [] } );
     my @new = $self->new_files(%arg);
     return if !@new;
     my $autodir = $self->autodir;
@@ -209,6 +204,7 @@ sub drain {
             }
             my %have_dir;
             foreach my $file (@new) {
+                next if !$want{$file->channel};
                 my $path = my $dest_path = $file->to;
                 if ($strip) {
                     my $n = $strip;
@@ -292,7 +288,27 @@ sub clobber     { $_[0]->{'clobber'}   }
 
 sub dir         { $_[0]->{'_dir'}        }
 sub source      { $_[0]->{'_source'}     }
-sub channels    { @{ $_[0]->{'_channels'} } }
+
+sub channels {
+    my $self = shift;
+    my @chan = @{ $_[0]->{'_channels'} };
+    return @chan if !@_;
+    my %want;
+    foreach my $spec (@_) {
+        if (s/^(pcre|regexp)://) {
+            my $rx = qr/$spec/;
+            $want{$_} = 1 for grep { $_ =~ $rx } @chan;
+        }
+        elsif (s/^glob:// || m{(?:^|/)[*](?:/|$)}) {
+            my $rx = _pattern2regexp($spec);
+            $want{$_} = 1 for grep { $_ =~ $rx } @chan;
+        }
+        else {
+            $want{$spec} = 1;
+        }
+    }
+    return grep { $want{$_->id} } @chan;
+}
 
 sub files {
     my ($self) = @_;
