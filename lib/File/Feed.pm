@@ -286,7 +286,7 @@ sub channels {
             my $rx = qr/$spec/;
             $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
-        elsif ($spec =~ s/^glob:// || m{(?:^|/)[*](?:/|$)}) {
+        elsif ($spec =~ s/^glob:// || $spec =~ /[*?{}]/) {
             my $rx = _pattern2regexp($spec);
             $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
