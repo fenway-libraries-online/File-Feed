@@ -6,7 +6,10 @@ use warnings;
 use URI;
 
 sub new {
-    my ($cls, $uri) = @_;
+    my $cls = shift;
+    unshift @_, 'uri' if @_ % 2;
+    my %arg = @_;
+    my $uri = $arg{'uri'} or die "Can't instantiate a source without a URI";
     $uri = URI->new($uri) if !ref $uri;
     my $scheme = $uri->scheme;
     $cls .= '::' . lc $scheme;

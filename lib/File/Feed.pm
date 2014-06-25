@@ -26,6 +26,10 @@ sub new {
     my ($cls, $dir) = @_;
     my $kv = File::Kvpar->new('+<', "$dir/feed.kv");
     my ($head, @channels) = $kv->elements;
+    if ($head->{'perl-class'}) {
+        $cls = $head->{'perl-class'};
+        eval "use $cls; 1" or die "Can't use feed class $cls: $!";
+    }
     @channels = grep { $_->{'@'} eq 'channel' } @channels;
     @channels = ({
         'from' => '.',
@@ -33,18 +37,15 @@ sub new {
         'description' => 'default channel',
         'filter' => 'glob:*',
     }) if !@channels;
-    my $source = File::Feed::Source->new($head->{'source'});
     my $self = bless {
         '_dir' => $dir,
-        '_source' => $source,
         '_fileskv' => File::Kvpar->new('+<', "$dir/files.kv"),
         %$head,
         '_random_buf' => '',
     }, $cls;
+    $self->{'_source'} = $self->_source_instance('uri' => $head->{'source'});
     $self->{'_feedkv'} = $kv;
-    $self->{'_channels'} = [ map {
-        File::Feed::Channel->new('_feed' => $self, %$_)
-    } @channels ];
+    $self->{'_channels'} = [ map { $self->_channel_instance(%$_) } @channels ];
     return $self;
 }
 
@@ -95,14 +96,14 @@ sub fill {
                 }
                 if ($source->fetch($from, $dest)) {
                     link $dest, $arch or die;
-                    push @files, File::Feed::File->new(
+                    push @files, $self->_file_instance(
                         '#'       => $from,
                         'feed'    => $self->id,
                         'source'  => $source->uri,
                         'channel' => $chan->id,
                         'from'    => $from,
                         'to'      => $to,
-                    )
+                    );
                 }
             }
         }
@@ -116,6 +117,26 @@ sub fill {
     return @files;
 }
 
+sub _source_instance {
+    my $self = shift;
+    return File::Feed::Source->new(@_);
+}
+
+sub _channel_instance {
+    my $self = shift;
+    return File::Feed::Channel->new('_feed' => $self, @_)
+}
+
+sub _file_instance {
+    my $self = shift;
+    return File::Feed::File->new(@_);
+}
+
+sub _kit_instance {
+    my $self = shift;
+    return File::Kit->new(@_);
+}
+
 sub new_files {
     my $self = shift;
     my $filter = $self->_filter(@_);
@@ -124,7 +145,7 @@ sub new_files {
     _crawl($new_dir, \@files);
     s{^$new_dir/}{} for @files;
     my %want = map { $_ => 1 } @files;
-    return map  { File::Feed::File->new(%$_) }
+    return map  { $self->_file_instance(%$_) }
            grep { $want{$_->{'to'}} && $filter->($_) }
            $self->files;
 }
@@ -237,8 +258,8 @@ sub assemble {
     }
     else {
         foreach (@_) {
-            my $file = File::Feed::File->new(%$_);
-            my $kit = File::Kit->new($file);
+            my $file = $self->_file_instance(%$_);
+            my $kit = $self->_kit_instance($file);
         }
     }
 }
