@@ -218,12 +218,12 @@ sub drain {
                 my $dest_dir = dirname($dest);
                 mkpath($dest_dir) if ! $have_dir{$dest_dir}++ && !-d $dest_dir;
                 if (-e $dest) {
-                    if (-s _ == -s $new) {
-                        print STDERR "File $dest exists with same size, deleting it";
+                    if ($arg{'clobber'}) {
+                        print STDERR "File $dest already exists, deleting it\n";
                         unlink $dest;
                     }
                     else {
-                        print STDERR "File $dest exists with different size, skipping $new\n";
+                        print STDERR "File $dest already exists, skipping $new\n";
                         next;
                     }
                 }
