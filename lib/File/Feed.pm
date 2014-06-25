@@ -7,6 +7,7 @@ use File::Kvpar;
 use File::Kit;
 use File::Feed::Channel;
 use File::Feed::Source;
+use File::Feed::Util;
 use File::Path qw(mkpath);
 use File::Copy qw(move copy);
 use File::Basename qw(basename dirname);
@@ -282,17 +283,8 @@ sub channels {
     return @chan if !@_;
     my %chan;
     foreach my $spec (@_) {
-        if ($spec =~ s/^(pcre|regexp)://) {
-            my $rx = qr/$spec/;
-            $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
-        }
-        elsif ($spec =~ s/^glob:// || $spec =~ /[*?{}]/) {
-            my $rx = _pattern2regexp($spec);
-            $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
-        }
-        else {
-            $chan{$spec} = 1;
-        }
+        my $rx = File::Feed::Util::pat2rx($spec);
+        $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
     }
     return grep { $chan{$_->id} } @chan;
 }
