@@ -284,9 +284,10 @@ sub channels {
     my %chan;
     foreach my $spec (@_) {
         my $rx = File::Feed::Util::pat2rx($spec);
-        $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
+        $chan{$_} = $_ for map { my $c = $_->id; $c =~ $rx ? ($_) : () } @chan;
     }
-    return grep { $chan{$_->id} } @chan;
+    return values %chan;
+    #return grep { $chan{$_->id} } @chan;
 }
 
 sub files {
