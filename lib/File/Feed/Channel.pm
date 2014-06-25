@@ -25,7 +25,7 @@ sub filter {
     my ($self) = @_;
     return $self->{'_filter'} if $self->{'_filter'};
     my $spec = $self->{'filter'} or return $self->{'_filter'} = sub { 1 };
-    if ($spec =~ s/^pcre://) {
+    if ($spec =~ s/^(pcre|regexp)://) {
         my $rx = qr/$spec/;
         return $self->{'_filter'} = sub { shift() =~ $rx };
     }
