@@ -31,11 +31,13 @@ sub cmd_fill {
 }
 
 sub cmd_new {
-    usage() if @ARGV < 1;
+    my %opt;
+    GetOptions(\%opt, qw(q)) && @ARGV or usage();
     my $feed = File::Feed->new(shift @ARGV);
     my %filter;
     $filter{'channels'} = [@ARGV] if @ARGV;
     my @new = $feed->new_files(%filter);
+    exit @new ? 0 : 1 if $opt{'q'};
     print $_->to, "\n" for @new;
 }
 
