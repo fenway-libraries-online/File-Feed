@@ -132,9 +132,9 @@ sub _kit_instance {
 }
 
 sub new_files {
-    my $self = shift;
+    my ($self, %arg) = @_;
     # What channels should we look at?
-    my %chan = map { $_ => 1 } $self->channels(@_);
+    my %chan = map { $_ => 1 } $self->channels(@{ $arg{'channels'} || [] });
     # Within those channels, what files are new?
     my $new_dir = $self->path('new');
     my @new;
@@ -176,7 +176,7 @@ sub drain {
     my $to = delete $arg{'to'}
         or die "No destination for drain";
     my $strip = $arg{'strip_leading_components'};
-    my %want = map { $_ => 1 } $self->channels( @{ $arg{'channels'} || [] } );
+    my %chan = map { $_ => 1 } $self->channels( @{ $arg{'channels'} || [] } );
     my @new = $self->new_files(%arg);
     return if !@new;
     my $autodir = $self->autodir;
@@ -191,7 +191,7 @@ sub drain {
             }
             my %have_dir;
             foreach my $file (@new) {
-                next if !$want{$file->channel};
+                next if !$chan{$file->channel};
                 my $path = my $dest_path = $file->to;
                 if ($strip) {
                     my $n = $strip;
@@ -280,21 +280,21 @@ sub channels {
     my $self = shift;
     my @chan = @{ $self->{'_channels'} };
     return @chan if !@_;
-    my %want;
+    my %chan;
     foreach my $spec (@_) {
         if (s/^(pcre|regexp)://) {
             my $rx = qr/$spec/;
-            $want{$_} = 1 for grep { $_ =~ $rx } @chan;
+            $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
         elsif (s/^glob:// || m{(?:^|/)[*](?:/|$)}) {
             my $rx = _pattern2regexp($spec);
-            $want{$_} = 1 for grep { $_ =~ $rx } @chan;
+            $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
         else {
-            $want{$spec} = 1;
+            $chan{$spec} = 1;
         }
     }
-    return grep { $want{$_->id} } @chan;
+    return grep { $chan{$_->id} } @chan;
 }
 
 sub files {

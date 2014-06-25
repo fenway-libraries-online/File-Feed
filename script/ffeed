@@ -34,9 +34,9 @@ sub cmd_new {
     my %opt;
     GetOptions(\%opt, qw(q c m)) && @ARGV or usage();
     my $feed = File::Feed->new(shift @ARGV);
-    my %filter;
-    $filter{'channels'} = [@ARGV] if @ARGV;
-    my @new = $feed->new_files(%filter);
+    my %arg;
+    $arg{'channels'} = [@ARGV] if @ARGV;
+    my @new = $feed->new_files(%arg);
     exit(@new ? 0 : 1) if $opt{'q'};
     if ($opt{'c'}) {
         print scalar(@new), "\n";
