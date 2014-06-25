@@ -278,7 +278,7 @@ sub source      { $_[0]->{'_source'}     }
 
 sub channels {
     my $self = shift;
-    my @chan = @{ $_[0]->{'_channels'} };
+    my @chan = @{ $self->{'_channels'} };
     return @chan if !@_;
     my %want;
     foreach my $spec (@_) {
