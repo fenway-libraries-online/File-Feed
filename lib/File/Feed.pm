@@ -133,37 +133,24 @@ sub _kit_instance {
 
 sub new_files {
     my $self = shift;
-    my $filter = $self->_channel_filter(@_);
+    # What channels should we look at?
+    my %chan = map { $_ => 1 } $self->channels(@_);
+    # Within those channels, what files are new?
     my $new_dir = $self->path('new');
-    my @files;
-    _crawl($new_dir, \@files);
-    s{^$new_dir/}{} for @files;
-    my %want = map { $_ => 1 } @files;
-    return map  { $self->_file_instance(%$_) }
-           grep { $want{$_->{'to'}} && $filter->($_) }
+    my @new;
+    _crawl($new_dir, \@new);
+    s{^$new_dir/}{} for @new;
+    my %new  = map { $_ => 1 } @new;
+    # Instantiate all files meeting those criteria
+    return map {
+               $self->_file_instance(%$_)
+           }
+           grep {
+               $new{$_->{'to'}}
+               &&
+               $chan{$_->{'channel'}}
+           }
            $self->files;
-}
-
-sub _channel_filter {
-    my ($self, %arg) = @_;
-    return sub { 1 } if !%arg;
-    my @tests;
-    if (defined(my $chan = delete $arg{'channels'})) {
-        my $r = ref $chan;
-        my %chan = $r eq 'ARRAY'  ? map { $_ => 1 } @$chan
-                 : $r eq 'HASH'   ? %$chan
-                 : $r eq 'Regexp' ? map { $_ => 1 } grep { $_->id =~ $chan } $self->channels
-                 : die "Invalid filter type ($r)"
-                 ;
-        push @tests, sub { $chan{ shift()->{'channel'} } };
-    }
-    return sub {
-        my ($file) = @_;
-        foreach (@tests) {
-            return if !$_->($file);
-        }
-        return 1;
-    }
 }
 
 sub _crawl {
