@@ -135,7 +135,7 @@ sub _kit_instance {
 sub new_files {
     my ($self, %arg) = @_;
     # What channels should we look at?
-    my %chan = map { $_ => 1 } $self->channels(@{ $arg{'channels'} || [] });
+    my %chan = map { $_->id => 1 } $self->channels(@{ $arg{'channels'} || [] });
     # Within those channels, what files are new?
     my $new_dir = $self->path('new');
     my @new;
