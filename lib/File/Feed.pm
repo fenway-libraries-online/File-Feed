@@ -282,11 +282,11 @@ sub channels {
     return @chan if !@_;
     my %chan;
     foreach my $spec (@_) {
-        if (s/^(pcre|regexp)://) {
+        if ($spec =~ s/^(pcre|regexp)://) {
             my $rx = qr/$spec/;
             $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
-        elsif (s/^glob:// || m{(?:^|/)[*](?:/|$)}) {
+        elsif ($spec =~ s/^glob:// || m{(?:^|/)[*](?:/|$)}) {
             my $rx = _pattern2regexp($spec);
             $chan{$_} = 1 for grep { $_ =~ $rx } @chan;
         }
