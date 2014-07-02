@@ -14,12 +14,68 @@ my $cmd = shift;
 my $code = __PACKAGE__->can("cmd_$cmd") or usage();
 $code->();
 
-sub cmd_fill {
-    my %opt;
-    GetOptions(\%opt, qw(m v)) && @ARGV or usage();
-    my $feed = File::Feed->new(shift @ARGV);
-    my @new = $feed->fill(@ARGV);
-    if ($opt{'m'}) {
+sub cmd_fill { _fill_or_new('fill') }
+
+sub cmd_new { _fill_or_new('new_files') }
+
+sub cmd_drain {
+    #@ drain [OPTIONS...] [FEED] [SINK...]
+    #@ basic options:
+    #@      -c CHANNEL  Channels to drain (repeatable)  [all]
+    #@      -p NUM      Strip leading components        0
+    #@      -f          Clobber existing files          [no clobber]
+    #@ output options:
+    #@      -q          Exit status indicates result    [off]
+    #@      -n          Print only number of files      [off]
+    #@      -m          Print results in kvpar format   [off]
+    #@      -v          Be verbose                      [off]
+    my (%arg, %opt);
+    GetOptions(
+        # Things we pass to the feed instance
+        'c=s@' => \$arg{'channels'},
+        'p=i'  => \$arg{'strip'},
+        'f'    => \$arg{'clobber'},
+        # Output options
+        'q'    => \$opt{'q'},
+        'n'    => \$opt{'n'},
+        'm'    => \$opt{'m'},
+        'v'    => \$opt{'v'},
+    ) or usage();
+    #@ examples:
+    #@      ffeed drain
+    #@      ffeed drain $feed
+    #@      ffeed drain . '/tmp/%(file.path)'
+    #@      ffeed drain $feed 'kit:pickup/%(datetime).%(project).kit'
+    push @ARGV, '.' if @ARGV == 0;
+    my $dir = shift @ARGV;
+    $arg{'sinks'} = [@ARGV] if @ARGV;
+    my @out = File::Feed->new($dir)->drain(%arg);
+    exit(@out ? 0 : 1) if $opt{'quiet'};
+    if ($opt{'n'}) {
+        print scalar(@out), "\n";
+    }
+    elsif ($opt{'m'}) {
+        File::Kvpar->new(\*STDOUT)->write(@out);
+    }
+    elsif ($opt{'v'}) {
+        printf "%s <= %s\n", $_->to, $_->from for @out;
+    }
+    else {
+        print $_->to, "\n" for @out;
+    }
+}
+
+sub _fill_or_new {
+    my $method = shift;
+    my (%opt, %arg);
+    GetOptions(\%opt, qw(c=s@ q n m v)) && @ARGV == 1 or usage();
+    $arg{'channels'} = $opt{'c'} if $opt{'c'};
+    my @new = File::Feed->new(@ARGV)->$method(%arg);
+    exit(@new ? 0 : 1) if $opt{'q'};
+    if ($opt{'n'}) {
+        print scalar(@new), "\n";
+    }
+    elsif ($opt{'m'}) {
         File::Kvpar->new(\*STDOUT)->write(@new);
     }
     elsif ($opt{'v'}) {
@@ -30,44 +86,63 @@ sub cmd_fill {
     }
 }
 
+sub usage {
+    if (@_) {
+        print STDERR 'usage: ffeed ', shift(), "\n";
+    }
+    else {
+        print STDERR <<'EOS';
+usage: ffeed COMMAND [ARG...]
+commands:
+    fill            Fill a feed with new files
+    new             List new files in a feed
+    drain           Move new files to DIR
+    assemble        Assemble files into kits
+EOS
+    }
+    exit 1;
+}
+
+__END__
+
 sub cmd_new {
-    my %opt;
-    GetOptions(\%opt, qw(q c m)) && @ARGV or usage();
+    my (%opt, %arg);
+    GetOptions(\%opt, qw(c=s@ q n m)) && @ARGV or usage();
     my $feed = File::Feed->new(shift @ARGV);
-    my %arg;
-    $arg{'channels'} = [@ARGV] if @ARGV;
+    $arg{'channels'} = $opt{'c'} if $opt{'c'};
     my @new = $feed->new_files(%arg);
     exit(@new ? 0 : 1) if $opt{'q'};
-    if ($opt{'c'}) {
+    if ($opt{'n'}) {
         print scalar(@new), "\n";
     }
     elsif ($opt{'m'}) {
         File::Kvpar->new(\*STDOUT)->write(@new);
+    }
+    elsif ($opt{'v'}) {
+        printf "%s <= %s\n", $_->to, $_->from for @new;
     }
     else {
         print $_->to, "\n" for @new;
     }
 }
 
-sub cmd_drain {
-    my %opt;
-    GetOptions(\%opt, qw(p=i f)) && @ARGV > 1 or usage();
+sub cmd_fill {
+    my (%opt, %arg);
+    GetOptions(\%opt, qw(c=s@ q n m v)) && @ARGV or usage();
     my $feed = File::Feed->new(shift @ARGV);
-    my $dir = shift @ARGV;
-    my %arg;
-    $arg{'channels'} = [@ARGV] if @ARGV;
-    $arg{'strip_leading_components'} = $opt{'p'} if $opt{'p'};
-    $arg{'clobber'} = 1 if $opt{'f'};
-    $feed->drain('to' => $dir, %arg);
-}
-
-sub usage {
-    print STDERR <<'EOS';
-usage: ffeed COMMAND [ARG...]
-commands:
-    fill  FEED [CHANNEL...]        Fill a feed with new files
-    new   FEED [CHANNEL...]        List new files in a feed
-    drain FEED DIR [CHANNEL...]    Move new files to DIR
-EOS
-    exit 1;
+    $arg{'channels'} = $opt{'c'} if $opt{'c'};
+    my @new = $feed->fill(@ARGV);
+    exit(@new ? 0 : 1) if $opt{'q'};
+    if ($opt{'n'}) {
+        print scalar(@new), "\n";
+    }
+    elsif ($opt{'m'}) {
+        File::Kvpar->new(\*STDOUT)->write(@new);
+    }
+    elsif ($opt{'v'}) {
+        printf "%s <= %s\n", $_->to, $_->from for @new;
+    }
+    else {
+        print $_->to, "\n" for @new;
+    }
 }

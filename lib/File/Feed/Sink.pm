@@ -1,4 +1,4 @@
-package File::Feed::Source;
+package File::Feed::Sink;
 
 use strict;
 use warnings;
@@ -17,12 +17,13 @@ sub new {
     else {
         %arg = @_;
     }
-    my $uri = $arg{'#'} || $arg{'uri'} or die "Can't instantiate a source without a URI";
+    my $uri = $arg{'#'} || $arg{'uri'} or die "Can't instantiate a sink without a URI";
+    $uri = 'file://' . $uri if $uri =~ m{^/};
     $uri = URI->new($uri) if !ref $uri;
     my $scheme = $uri->scheme;
     $cls .= '::' . lc $scheme;
     eval "use $cls; 1" or die $@;
-    bless +{
+    bless {
         'uri'  => $uri,
         #'host' => $uri->host,
         #'user' => $uri->user,
@@ -32,7 +33,8 @@ sub new {
 }
 
 sub uri { $_[0]->{'uri'} }
-sub host { $_[0]->{'host'} ||= $_[0]->{'uri'}->host }
-sub root { $_[0]->{'root'} ||= $_[0]->{'uri'}->path }
+sub host { $_[0]->{'host'} }
+sub root { $_[0]->{'root'} }
 
 1;
+

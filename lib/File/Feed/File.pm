@@ -5,6 +5,7 @@ use warnings;
 
 sub new {
     my $cls = shift;
+    unshift @_, 'id' if @_ % 2;
     my %arg = @_;
     $arg{'#'} ||= delete $arg{'id'};
     $arg{'@'} ||= 'file';

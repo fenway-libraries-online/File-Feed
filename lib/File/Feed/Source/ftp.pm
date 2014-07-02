@@ -3,10 +3,12 @@ package File::Feed::Source::ftp;
 use strict;
 use warnings;
 
+use vars qw(@ISA);
+
+@ISA = qw(File::Feed::Source);
+
+use File::Feed::Source;
 use File::Feed::File;
-
-use base 'File::Feed::Source';
-
 use Net::FTP;
 use Net::Netrc;
 
@@ -43,6 +45,7 @@ sub list {
     my ($self, $from, $recursive) = @_;
     goto &rlist if $recursive;
     my $client = $self->{'_client'};
+    $from = '.' if !defined $from;
     my $list = $client->ls($from)
         or die "Can't list $from: ", $client->message;
     return @$list;
