@@ -14,8 +14,7 @@ sub id          { $_[0]->{'#'          } }
 sub recursive   { $_[0]->{'recursive'  } }
 sub description { $_[0]->{'description'} }
 
-sub from { $_[0]->{'from'} || $_[0]->{'in'} || $_[0]->{'#'} }
-sub to   { $_[0]->{'to'  } || $_[0]->{'in'} || $_[0]->{'#'} }
+sub path { $_[0]->{'path'} || $_[0]->{'#'} }
 
 sub autodir { exists $_[0]->{'autodir'} ? $_[0]->{'autodir'} : $_[0]->{'_feed'}->autodir }
 sub repeat  { exists $_[0]->{'repeat' } ? $_[0]->{'repeat' } : $_[0]->{'_feed'}->repeat  }

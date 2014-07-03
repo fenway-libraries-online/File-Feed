@@ -18,21 +18,40 @@ sub new {
         %arg = @_;
     }
     my $uri = $arg{'#'} || $arg{'uri'} or die "Can't instantiate a source without a URI";
+    $uri = 'file://' . $uri if $uri =~ m{^/};
     $uri = URI->new($uri) if !ref $uri;
     my $scheme = $uri->scheme;
     $cls .= '::' . lc $scheme;
     eval "use $cls; 1" or die $@;
-    bless +{
+    bless {
         'uri'  => $uri,
-        #'host' => $uri->host,
-        #'user' => $uri->user,
-        #'password' => $uri->password,
-        #'root' => $uri->path,
     }, $cls;
 }
 
 sub uri { $_[0]->{'uri'} }
 sub host { $_[0]->{'host'} ||= $_[0]->{'uri'}->host }
 sub root { $_[0]->{'root'} ||= $_[0]->{'uri'}->path }
+sub user { $_[0]->{'user'} ||= $_[0]->{'uri'}->user }
+sub password { $_[0]->{'password'} ||= $_[0]->{'uri'}->password }
+
+sub fetch {
+    my ($self, %arg) = @_;
+    my $channel = $arg{'channel'};
+    my $exclude = $arg{'exclude'} || {};
+    my $dest    = $arg{'destination'};
+    my $root    = $self->root;
+    my $recurse = $channel->recursive;
+    my $filter  = $channel->file_filter;
+    my $path    = $channel->path;
+    my $lpath   = $channel->local_path;
+    my $dir  = defined $path  ? "$root/$path"  : $root;
+    my $ldir = defined $lpath ? "$dest/$lpath" : $dest;
+    my @fetched;
+    foreach ($self->list($dir, $recurse)) {
+        next if $exclude->{$_} || !$filter->($_);
+        $self->fetch_file("$path/$_", "$lpath/$_");
+    }
+    return @fetched;
+}
 
 1;

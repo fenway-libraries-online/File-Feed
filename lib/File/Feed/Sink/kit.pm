@@ -17,7 +17,7 @@ sub path { $_[0]->{'path'} ||= $_[0]->{'uri'}->path }
 sub begin {
     my ($self) = @_;
     my $path = $self->path;
-    $self->{'_kit'} = File::Kit->create($path);
+    $self->{'_kit'} = File::Kit->new($path);
     return $self;
 }
 

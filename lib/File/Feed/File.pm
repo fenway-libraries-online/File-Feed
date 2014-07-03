@@ -14,8 +14,6 @@ sub new {
 
 sub id { $_[0]->{'#'} }
 sub path { $_[0]->{'#'} }
-sub from { $_[0]->{'from'} }
-sub to { $_[0]->{'to'} }
 sub channel { $_[0]->{'_channel'} }
 
 1;

@@ -28,32 +28,26 @@ sub end { }
 sub id { $_[0]->{'#'} }
 
 sub list {
-    my ($self, $from, $recursive) = @_;
-    goto &rlist if $recursive;
+    my ($self, $path, $recursive) = @_;
     my $root = $self->root;
-    my $dir = defined $from ? "$root/$from" : $root;
-    my $ofs = length($dir) + 1;
-    my @files = glob("$dir/*");
-    return grep { -f $_ ? (substr($_, $ofs)) : () } @files;
-}
-
-sub rlist {
-    my ($self, $from) = @_;
-    my $root = $self->root;
-    my $dir = "$root/$from";
-    my $ofs = length($dir) + 1;
-    my @files = glob("$dir/*");
-    my @list;
-    _crawl($from, \@list);
-    return @list;
+    my $abspath = defined $path ? "$root/$path" : $root;
+    my $ofs = length($abspath) + 1;
+    my @files;
+    if ($recursive) {
+        _crawl($abspath, \@files);
+    }
+    else {
+        @files = fgrep { -f $_ } glob("$abspath/*");
+    }
+    return map { substr($_, $ofs) } @files;
 }
 
 sub _crawl {
-    my ($from, $list) = @_;
-    my @files = glob("$from/*");
+    my ($path, $list) = @_;
+    my @files = glob("$path/*");
     foreach (@files) {
         if (-d $_) {
-            _crawl($from, $list);
+            _crawl($path, $list);
         }
         else {
             push @$list, $_;
@@ -61,13 +55,13 @@ sub _crawl {
     }
 }
 
-sub fetch {
+sub fetch_file {
     my ($self, $from, $to) = @_;
     if ($self->{'copy'}) {
-        copy($from, $to);
+        copy($from, $to) or die "Can't fetch $from: $!";
     }
     else {
-        move($from, $to);
+        move($from, $to) or die "Can't fetch $from: $!";
     }
 }
 

@@ -42,44 +42,64 @@ sub end {
 }
 
 sub list {
-    my ($self, $from, $recursive) = @_;
-    goto &rlist if $recursive;
+    my ($self, $path, $recursive) = @_;
+    my $root = $self->root;
+    my $abspath = defined $path ? "$root/$path" : $root;
+    my $ofs = length($abspath) + 1;
     my $client = $self->{'_client'};
-    $from = '.' if !defined $from;
-    my $list = $client->ls($from)
-        or die "Can't list $from: ", $client->message;
+    my $dir = $client->dir($abspath) or return;
+    my @files;
+    foreach my $line (@$dir) {
+        next if $line !~ /^([-d])[-a-z]{9}\s.+\s(\S+)$/;
+        my ($type, $file) = ($1, "$abspath/$2");
+        if ($type eq 'd') {
+            ;
+        }
+        else {
+            push @files, $file;
+        }
+    }
+    return map { substr($_, $ofs) } @files;
+}
+
+sub oldlist {
+    my ($self, $path, $recursive) = @_;
+    goto &rlist if $recursive;
+    $path = '.' if !defined $path;
+    my $client = $self->{'_client'};
+    my $list = $client->ls($path)
+        or die "Can't list $path: ", $client->message;
     return @$list;
 }
 
 sub rlist {
-    my ($self, $from) = @_;
+    my ($self, $path) = @_;
     my $client = $self->{'_client'};
     my @list;
-    _crawl($client, $from, \@list);
+    _crawl($client, $path, \@list);
     return @list;
 }
 
 sub _crawl {
-    my ($client, $from, $list) = @_;
-    my $dir = $client->dir($from) or return;
+    my ($client, $path, $list) = @_;
+    my $dir = $client->dir($path) or return;
     foreach my $line (@$dir) {
         next if $line !~ /^([-d])[-a-z]{9}\s.+\s(\S+)$/;
-        my ($type, $name) = ($1, $2);
-        my $path = "$from/$name";
+        my ($type, $file) = ($1, "$path/$2");
         if ($type eq 'd') {
-            _crawl($client, $path, $list);
+            _crawl($client, $file, $list);
         }
         else {
-            push @$list, $path;
+            push @$list, $file;
         }
     }
 }
 
-sub fetch {
+sub fetch_file {
     my ($self, $from, $to) = @_;
     my $client = $self->{'_client'};
     $client->get($from, $to)
-        or die "Can't get $from: ", $client->message;
+        or die "Can't fetch $from: ", $client->message;
 }
 
 sub basename {
