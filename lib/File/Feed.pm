@@ -211,6 +211,18 @@ sub drain {
     return @files;
 }
 
+sub context {
+    my $self = shift;
+    my %ctx = @_;
+    foreach (values %ctx) {
+        next if ref $_ ne 'HASH';
+        while (my ($k, $v) = each %$_) {
+            $ctx{$k} = $v if $v !~ /^[[:punct:]]/;
+        }
+    }
+    return \%ctx;
+}
+
 sub oldfill {
     my $self = shift;
     my @files;
