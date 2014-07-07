@@ -44,12 +44,14 @@ sub fetch {
     my $filter  = $channel->file_filter;
     my $path    = $channel->path;
     my $lpath   = $channel->local_path;
-    my $dir  = defined $path  ? "$root/$path"  : $root;
+    my $dir  = defined $path  ? $path  : '.';
     my $ldir = defined $lpath ? "$dest/$lpath" : $dest;
     my @fetched;
     foreach ($self->list($dir, $recurse)) {
-        next if $exclude->{$_} || !$filter->($_);
-        $self->fetch_file("$path/$_", "$lpath/$_");
+        my $from = ( defined $path ? $path : '.' ) . "/$_";
+        my $to = "$ldir/$_";
+        next if $exclude->{$from} || !$filter->($_);
+        $self->fetch_file($from, $to);
     }
     return @fetched;
 }

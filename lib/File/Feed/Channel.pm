@@ -15,6 +15,7 @@ sub recursive   { $_[0]->{'recursive'  } }
 sub description { $_[0]->{'description'} }
 
 sub path { $_[0]->{'path'} || $_[0]->{'#'} }
+sub local_path { $_[0]->{'local-path'} || '.' }
 
 sub autodir { exists $_[0]->{'autodir'} ? $_[0]->{'autodir'} : $_[0]->{'_feed'}->autodir }
 sub repeat  { exists $_[0]->{'repeat' } ? $_[0]->{'repeat' } : $_[0]->{'_feed'}->repeat  }

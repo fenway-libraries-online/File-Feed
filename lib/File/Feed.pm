@@ -28,8 +28,11 @@ use constant FROZEN   => '@frozen';
 sub new {
     my ($cls, $dir) = @_;
     my $kv = File::Kvpar->new('+<', "$dir/feed.kv");
+    open my $ls, '+>>', "$dir/files.list" or die "Can't open files.list: $!";
+    my @ls = <$ls>;
+    chomp @ls;
     my @elems = $kv->elements;
-    my ($feed, $source, @etc);
+    my ($feed, $source, @sinks, @etc);
     ($feed,   @etc) = grep { $_->{'@'} eq 'feed'    } @elems; die if !defined $feed   || @etc;
     ($source, @etc) = grep { $_->{'@'} eq 'source'  } @elems; die if !defined $source || @etc;
     my @sinks       = grep { $_->{'@'} eq 'sink'    } @elems;
@@ -54,7 +57,15 @@ sub new {
     }, $cls;
     $self->{'_source'  } = $self->_source_instance($source);
     $self->{'_channels'} = [ map { $self->_channel_instance(%$_) } @channels ];
-    $self->{'_sinks'   } = [ map { $self->_sink_instance(%$_)    } @sinks    ];
+    my %sinks;
+    foreach (@sinks) {
+        my $id = $_->{'#'};
+        $id = 'default' if !defined $id;
+        die "Duplicate sinks: $id" if exists $sink{$id};
+        $sinks{$id} = $_;
+    }
+    ($sinks{'default'}) = (values %sinks) if scalar(%sinks) == 1;
+    $self->{'_sinks'} = \%sinks;
     return $self;
 }
 
@@ -98,7 +109,7 @@ sub new_files {
                $self->_file_instance(%$_)
            }
            grep {
-               $is_new{$_->{'to'}}
+               $is_new{$_->{'local-path'}}
                &&
                $chan{$_->{'channel'}}
            }
@@ -169,10 +180,12 @@ sub fill {
         my $new_head_len = length($self->path('new'));
         my %mkpath;
         foreach my $channel (@channels) {
-            my @paths = $source->list(
+            my @paths = $source->fetch(
                 'channel' => $channel,
                 'exclude' => \%logged,
+                'destination' => $self->path('archive'),
             );
+            next if !@paths;
             my $ldir = $channel->local_path;
             my $arch_chan_dir = $self->path('archive', $ldir);
             my $new_chan_dir  = $self->path('new',     $ldir);
@@ -195,7 +208,7 @@ sub fill {
                         'feed' => $self->id,
                         'source' => $source->uri,
                         'channel' => $channel->id,
-                        'local-path' => substr($new, $new_head_len),
+                        'local-path' => substr($new, $new_head_len + 1),
                     );
                 }
             }
@@ -217,6 +230,8 @@ sub drain {
     my $ok = eval {
         # Start draining
         $self->status(DRAINING) or die "Can't set status: not a feed?";
+        my $s = $arg{'sink'};
+        my $uri_proto = $self->{'_sinks'}{$s || 'default'} || $s || die "Can't determine sink";
         my %uri2files;
         foreach my $file (@new) {
             my $channel = $file->channel;
@@ -225,7 +240,7 @@ sub drain {
                 'channel' => $channel,
                 'file'    => $file,
             );
-            my $uri = $ctx->expand($file->destination);
+            my $uri = $ctx->expand($uri_proto . '/' . $file->destination);
             push @{ $uri2files{$uri} ||= [] }, $file;
         }
         while (my ($uri, $files) = each %uri2files) {

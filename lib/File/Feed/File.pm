@@ -14,6 +14,7 @@ sub new {
 
 sub id { $_[0]->{'#'} }
 sub path { $_[0]->{'#'} }
+sub local_path { $_[0]->{'local-path'} }
 sub channel { $_[0]->{'_channel'} }
 
 1;
