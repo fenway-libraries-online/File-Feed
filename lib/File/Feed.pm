@@ -28,11 +28,11 @@ use constant FROZEN   => '@frozen';
 sub new {
     my ($cls, $dir) = @_;
     my $kv = File::Kvpar->new('+<', "$dir/feed.kv");
-    open my $ls, '+>>', "$dir/files.list" or die "Can't open files.list: $!";
-    my @ls = <$ls>;
+    open my $lsfh, '+>>', "$dir/files.list" or die "Can't open files.list: $!";
+    my @ls = <$lsfh>;
     chomp @ls;
     my @elems = $kv->elements;
-    my ($feed, $source, @sinks, @etc);
+    my ($feed, $source, @etc);
     ($feed,   @etc) = grep { $_->{'@'} eq 'feed'    } @elems; die if !defined $feed   || @etc;
     ($source, @etc) = grep { $_->{'@'} eq 'source'  } @elems; die if !defined $source || @etc;
     my @sinks       = grep { $_->{'@'} eq 'sink'    } @elems;
@@ -54,6 +54,7 @@ sub new {
         '_feedkv' => $kv,
         '_fileskv' => File::Kvpar->new('+<', "$dir/files.kv"),
         '_random_buf' => '',
+        '_lsfh' => $lsfh,
     }, $cls;
     $self->{'_source'  } = $self->_source_instance($source);
     $self->{'_channels'} = [ map { $self->_channel_instance(%$_) } @channels ];
@@ -61,10 +62,10 @@ sub new {
     foreach (@sinks) {
         my $id = $_->{'#'};
         $id = 'default' if !defined $id;
-        die "Duplicate sinks: $id" if exists $sink{$id};
+        die "Duplicate sinks: $id" if exists $sinks{$id};
         $sinks{$id} = $_;
     }
-    ($sinks{'default'}) = (values %sinks) if scalar(%sinks) == 1;
+    ($sinks{'default'}) = (values %sinks) if scalar(keys %sinks) == 1;
     $self->{'_sinks'} = \%sinks;
     return $self;
 }
@@ -177,44 +178,39 @@ sub fill {
         my %logged = map { $_->{'path'} => $_ } $self->files;
         $source->begin($self);
         my @channels = $self->channels(@{ $arg{'channels'} || [] });
-        my $new_head_len = length($self->path('new'));
+        my ($tmpd, $arcd, $newd) = map { $self->path($_) } (FILLING, qw(archive new));
         my %mkpath;
+        my $lsfh = $self->{'_lsfh'};
         foreach my $channel (@channels) {
-            my @paths = $source->fetch(
+            my @fetched = $source->fetch(
                 'channel' => $channel,
                 'exclude' => \%logged,
-                'destination' => $self->path('archive'),
+                'destination' => $tmpd,
             );
-            next if !@paths;
+            my $dir  = $channel->path;
             my $ldir = $channel->local_path;
-            my $arch_chan_dir = $self->path('archive', $ldir);
-            my $new_chan_dir  = $self->path('new',     $ldir);
-            foreach my $path (@paths) {
-                my $arch = "$arch_chan_dir/$path";
-                my $new  = "$new_chan_dir/$path";
-                # Fetch to $arch then move to $new
-                foreach ($arch, $new) {
-                    # Don't clobber existing files
-                    die "File $path would overwrite $_" if -e $_;
-                    # Create any missing directories
-                    my $dir = dirname($_);
-                    mkpath $dir if !$mkpath{$dir}++ || !-d $dir;
+            foreach my $file (@fetched) {
+                my $path  = $file->{'path'};
+                print $lsfh $path, "\n";
+                my $lpath = $file->{'local-path'};
+                my $tmp_path = "$tmpd/$lpath";
+                foreach ($arcd, $newd) {
+                    my $other_path = "$_/$lpath";
+                    my $d = dirname($other_path);
+                    mkpath $d if !$mkpath{$d}++ || !-d $d;
+                    link $tmp_path, $other_path or die "Can't link $tmp_path into $d";
                 }
-                if ($source->fetch($path, $arch)) {
-                    link $arch, $new or die "Can't link $arch -> $new";
-                    push @new, $self->_file_instance(
-                        '#' => $path,
-                        'path' => $path,
-                        'feed' => $self->id,
-                        'source' => $source->uri,
-                        'channel' => $channel->id,
-                        'local-path' => substr($new, $new_head_len + 1),
-                    );
-                }
+                unlink "$tmpd/$lpath" or die;
+                push @new, $self->_file_instance(
+                    %$file,
+                    'feed' => $self->id,
+                    'source' => $source->uri,
+                    'channel' => $channel->id,
+                );
             }
         }
         $source->end;
-        $self->{'_fileskv'}->append(@new);
+        $self->{'_fileskv'}->append(@new) if @new;
         1;
     };
     $self->_cleanup;

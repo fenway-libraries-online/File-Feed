@@ -46,12 +46,19 @@ sub fetch {
     my $lpath   = $channel->local_path;
     my $dir  = defined $path  ? $path  : '.';
     my $ldir = defined $lpath ? "$dest/$lpath" : $dest;
+    my $pfx  = defined $path  ? $path  . '/' : '';
+    my $lpfx = defined $lpath ? $lpath . '/' : '';
     my @fetched;
     foreach ($self->list($dir, $recurse)) {
-        my $from = ( defined $path ? $path : '.' ) . "/$_";
+        my $from = defined $path ? "$path/$_" : $_;
         my $to = "$ldir/$_";
         next if $exclude->{$from} || !$filter->($_);
-        $self->fetch_file($from, $to);
+        $self->fetch_file($from, $to) or die "Can't fetch $from to $to: $!";
+        push @fetched, {
+            '#' => $pfx . $_,
+            'path' => $pfx . $_,
+            'local-path' => $lpfx . $_,
+        };
     }
     return @fetched;
 }

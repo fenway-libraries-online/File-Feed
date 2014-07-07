@@ -58,10 +58,10 @@ sub cmd_drain {
         File::Kvpar->new(\*STDOUT)->write(@out);
     }
     elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->to, $_->from for @out;
+        printf "%s <= %s\n", $_->local_path, $_->path for @out;
     }
     else {
-        print $_->to, "\n" for @out;
+        print $_->local_path, "\n" for @out;
     }
 }
 
@@ -70,7 +70,8 @@ sub _fill_or_new {
     my (%opt, %arg);
     GetOptions(\%opt, qw(c=s@ q n m v)) && @ARGV == 1 or usage();
     $arg{'channels'} = $opt{'c'} if $opt{'c'};
-    my @new = File::Feed->new(@ARGV)->$method(%arg);
+    my $feed = File::Feed->new(@ARGV);
+    my @new = $feed->$method(%arg);
     exit(@new ? 0 : 1) if $opt{'q'};
     if ($opt{'n'}) {
         print scalar(@new), "\n";
@@ -79,10 +80,10 @@ sub _fill_or_new {
         File::Kvpar->new(\*STDOUT)->write(@new);
     }
     elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->to, $_->from for @new;
+        printf "%s <= %s\n", $_->local_path, $_->path for @new;
     }
     else {
-        print $_->to, "\n" for @new;
+        print $_->local_path, "\n" for @new;
     }
 }
 
@@ -119,10 +120,10 @@ sub cmd_new {
         File::Kvpar->new(\*STDOUT)->write(@new);
     }
     elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->to, $_->from for @new;
+        printf "%s <= %s\n", $_->local_path, $_->path for @new;
     }
     else {
-        print $_->to, "\n" for @new;
+        print $_->local_path, "\n" for @new;
     }
 }
 
@@ -140,9 +141,9 @@ sub cmd_fill {
         File::Kvpar->new(\*STDOUT)->write(@new);
     }
     elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->to, $_->from for @new;
+        printf "%s <= %s\n", $_->local_path, $_->path for @new;
     }
     else {
-        print $_->to, "\n" for @new;
+        print $_->local_path, "\n" for @new;
     }
 }
