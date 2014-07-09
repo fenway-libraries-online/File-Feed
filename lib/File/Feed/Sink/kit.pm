@@ -12,11 +12,13 @@ use File::Kit;
 
 sub protocol { 'kit' }
 
+sub feed { $_[0]->{'_feed'} }
 sub path { $_[0]->{'path'} ||= $_[0]->{'uri'}->path }
 
 sub begin {
     my ($self) = @_;
     my $path = $self->path;
+    $path = $self->feed->dir . '/' . $path if $path !~ m{^/};  # XXX Really?
     $self->{'_kit'} = File::Kit->new($path);
     return $self;
 }
@@ -30,8 +32,10 @@ sub end {
 sub store {
     my $self = shift;
     my $kit = $self->{'_kit'};
+    my $from = $self->from;  # XXX Really?
     foreach my $file (@_) {
-        $kit->add($file->path, $file);
+        my $lpath = $file->local_path;
+        $kit->add("$from/$lpath", $file);
     }
 }
 
