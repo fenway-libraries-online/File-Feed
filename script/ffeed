@@ -14,38 +14,64 @@ my $cmd = shift;
 my $code = __PACKAGE__->can("cmd_$cmd") or usage();
 $code->();
 
-sub cmd_fill { _fill_or_new('fill') }
+sub cmd_create {
+    my %opt;
+    die "Not yet implemented";
+}
 
-sub cmd_new { _fill_or_new('new_files') }
+sub cmd_fill {
+    #> fill [OPTIONS...] [FEED]
+    #| basic options:
+    #|      -c CHANNEL  Channels to fill (repeatable)   [all]
+    #| output options:
+    #|      -q          Exit status indicates result    [off]
+    #|      -n          Print only number of files      [off]
+    #|      -m          Print results in kvpar format   [off]
+    #|      -v          Be verbose                      [off]
+    #.
+    unshift @_, 'fill';
+    goto &_fill_or_new;
+}
+
+sub cmd_new  {
+    #> new [OPTIONS...] [FEED]
+    #| basic options:
+    #|      -c CHANNEL  Channels to check (repeatable)  [all]
+    #| output options:
+    #|      -q          Exit status indicates result    [off]
+    #|      -n          Print only number of files      [off]
+    #|      -m          Print results in kvpar format   [off]
+    #|      -v          Be verbose                      [off]
+    #.
+    unshift @_, 'new_files';
+    goto &_fill_or_new;
+}
 
 sub cmd_drain {
-    #@ drain [OPTIONS...] [FEED] [SINK...]
-    #@ basic options:
-    #@      -c CHANNEL  Channels to drain (repeatable)  [all]
-    #@      -p NUM      Strip leading components        0
-    #@      -f          Clobber existing files          [no clobber]
-    #@ output options:
-    #@      -q          Exit status indicates result    [off]
-    #@      -n          Print only number of files      [off]
-    #@      -m          Print results in kvpar format   [off]
-    #@      -v          Be verbose                      [off]
+    #> drain [OPTIONS...] [FEED] [SINK...]
+    #| basic options:
+    #|      -c CHANNEL  Channels to drain (repeatable)  [all]
+    #| output options:
+    #|      -q          Exit status indicates result    [off]
+    #|      -n          Print only number of files      [off]
+    #|      -m          Print results in kvpar format   [off]
+    #|      -v          Be verbose                      [off]
+    #| examples:
+    #|      ffeed drain
+    #|      ffeed drain $feed
+    #|      ffeed drain . '/tmp/%(file.path)'
+    #|      ffeed drain $feed 'kit:pickup/%(datetime).%(project).kit'
+    #.
     my (%arg, %opt);
     GetOptions(
         # Things we pass to the feed instance
         'c=s@' => \$arg{'channels'},
-        'p=i'  => \$arg{'strip'},
-        'f'    => \$arg{'clobber'},
         # Output options
         'q'    => \$opt{'q'},
         'n'    => \$opt{'n'},
         'm'    => \$opt{'m'},
         'v'    => \$opt{'v'},
     ) or usage();
-    #@ examples:
-    #@      ffeed drain
-    #@      ffeed drain $feed
-    #@      ffeed drain . '/tmp/%(file.path)'
-    #@      ffeed drain $feed 'kit:pickup/%(datetime).%(project).kit'
     push @ARGV, '.' if @ARGV == 0;
     my $dir = shift @ARGV;
     $arg{'sinks'} = [@ARGV] if @ARGV;
@@ -68,8 +94,15 @@ sub cmd_drain {
 sub _fill_or_new {
     my $method = shift;
     my (%opt, %arg);
-    GetOptions(\%opt, qw(c=s@ q n m v)) && @ARGV == 1 or usage();
-    $arg{'channels'} = $opt{'c'} if $opt{'c'};
+    GetOptions(
+        # Things we pass to the feed instance
+        'c=s@' => \$arg{'channels'},
+        # Output options
+        'q'    => \$opt{'q'},
+        'n'    => \$opt{'n'},
+        'm'    => \$opt{'m'},
+        'v'    => \$opt{'v'},
+    ) && @ARGV == 1 or usage();
     my $feed = File::Feed->new(@ARGV);
     my @new = $feed->$method(%arg);
     exit(@new ? 0 : 1) if $opt{'q'};
@@ -91,59 +124,30 @@ sub usage {
     if (@_) {
         print STDERR 'usage: ffeed ', shift(), "\n";
     }
+    elsif (defined $cmd && open my $fh, '<', $0) {
+        my $started;
+        while (<$fh>) {
+            if (s/^ *#> $cmd\b//) {
+                print STDERR 'usage: ', $cmd, $_;
+                $started = 1;
+            }
+            elsif (s/^ *#\| //) {
+                print STDERR $_ if $started;
+            }
+            elsif (/^ *#\./) {
+                last if $started;
+            }
+        }
+    }
     else {
         print STDERR <<'EOS';
 usage: ffeed COMMAND [ARG...]
 commands:
+    create          Create a new feed
     fill            Fill a feed with new files
     new             List new files in a feed
     drain           Move new files to DIR
-    assemble        Assemble files into kits
 EOS
     }
     exit 1;
-}
-
-__END__
-
-sub cmd_new {
-    my (%opt, %arg);
-    GetOptions(\%opt, qw(c=s@ q n m)) && @ARGV or usage();
-    my $feed = File::Feed->new(shift @ARGV);
-    $arg{'channels'} = $opt{'c'} if $opt{'c'};
-    my @new = $feed->new_files(%arg);
-    exit(@new ? 0 : 1) if $opt{'q'};
-    if ($opt{'n'}) {
-        print scalar(@new), "\n";
-    }
-    elsif ($opt{'m'}) {
-        File::Kvpar->new(\*STDOUT)->write(@new);
-    }
-    elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->local_path, $_->path for @new;
-    }
-    else {
-        print $_->local_path, "\n" for @new;
-    }
-}
-
-sub cmd_fill {
-    my (%opt, %arg);
-    GetOptions(\%opt, qw(c=s@ q n m v)) && @ARGV or usage();
-    my $feed = File::Feed->new(shift @ARGV);
-    $arg{'channels'} = $opt{'c'} if $opt{'c'};
-    my @new = $feed->fill(@ARGV);
-    exit(@new ? 0 : 1) if $opt{'q'};
-    if ($opt{'n'}) {
-        print scalar(@new), "\n";
-    }
-    elsif ($opt{'m'}) {
-        File::Kvpar->new(\*STDOUT)->write(@new);
-    }
-    elsif ($opt{'v'}) {
-        printf "%s <= %s\n", $_->local_path, $_->path for @new;
-    }
-    else {
-        print $_->local_path, "\n" for @new;
-    }
 }
