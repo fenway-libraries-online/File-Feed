@@ -7,6 +7,7 @@ use File::Kvpar;
 use File::Kit;
 use File::Feed::Source;
 use File::Feed::Channel;
+use File::Feed::Context;
 use File::Feed::Sink;
 use File::Feed::Util;
 use File::Path qw(mkpath);
@@ -56,8 +57,12 @@ sub new {
         '_random_buf' => '',
         '_lsfh' => $lsfh,
     }, $cls;
-    $self->{'_source'  } = $self->_source_instance($source);
-    $self->{'_channels'} = [ map { $self->_channel_instance(%$_) } @channels ];
+    $self->{'_channels'} = [ map {
+            $self->_channel_instance(
+                '_source' => ($self->{'_source'} ||= $self->_source_instance(%$source)),
+                %$_,
+            )
+        } @channels ];
     my %sinks;
     foreach (@sinks) {
         my $id = $_->{'#'};
@@ -72,27 +77,24 @@ sub new {
 
 sub _source_instance {
     my $self = shift;
-    return File::Feed::Source->new(@_);
+    return File::Feed::Source->new(@_, '_feed' => $self);
 }
 
 sub _sink_instance {
     my $self = shift;
-    return File::Feed::Sink->new(@_);
+    return File::Feed::Sink->new(@_, '_feed' => $self);
 }
 
 sub _channel_instance {
     my $self = shift;
-    return File::Feed::Channel->new('_feed' => $self, @_)
+    return File::Feed::Channel->new(@_, '_feed' => $self);
 }
 
 sub _file_instance {
     my $self = shift;
-    return File::Feed::File->new(@_);
-}
-
-sub _kit_instance {
-    my $self = shift;
-    return File::Kit->new(@_);
+    my %arg = @_;
+    my $chan = $self->channel($arg{'channel'} || die "Can't determine file channel");
+    return File::Feed::File->new(%arg, '_channel' => $chan, '_feed' => $self);
 }
 
 sub new_files {
@@ -228,20 +230,27 @@ sub drain {
         $self->status(DRAINING) or die "Can't set status: not a feed?";
         my $s = $arg{'sink'};
         my $uri_proto = $self->{'_sinks'}{$s || 'default'} || $s || die "Can't determine sink";
+        $uri_proto = $uri_proto->{'#'} if ref $uri_proto;  # XXX Hack!
         my %uri2files;
         foreach my $file (@new) {
             my $channel = $file->channel;
             my $ctx = $self->context(
-                'source'  => $channel->source,
+                'source'  => $file->source,
                 'channel' => $channel,
                 'file'    => $file,
             );
-            my $uri = $ctx->expand($uri_proto . '/' . $file->destination);
+            my $uri = $ctx->expand($uri_proto);
             push @{ $uri2files{$uri} ||= [] }, $file;
         }
+        my $new_dir = $self->path('new');
         while (my ($uri, $files) = each %uri2files) {
-            my $sink = $self->_sink_instance($uri);
+            my $sink = $self->_sink_instance(
+                'uri' => $uri,
+                'from' => $new_dir,
+            );
+            $sink->begin;
             $sink->store(@$files);
+            $sink->end;
             push @files, @$files;
         }
         1;
@@ -252,15 +261,24 @@ sub drain {
 }
 
 sub context {
-    my $self = shift;
-    my %ctx = @_;
-    foreach (values %ctx) {
-        next if ref $_ ne 'HASH';
-        while (my ($k, $v) = each %$_) {
-            $ctx{$k} = $v if $v !~ /^[[:punct:]]/;
+    my ($self, %arg) = @_;
+    my %ctx;
+    _ctxatom($_, $arg{$_}, \%ctx) for qw(source channel sink file);
+    return File::Feed::Context->new(%ctx);
+}
+
+sub _ctxatom {
+    my ($key, $val, $h) = @_;
+    return if !defined $val;
+    if (ref $val) {
+        $h->{$key} = $val->{'#'} if defined $val->{'#'};
+        while (my ($k, $v) = each %$val) {
+            _ctxatom("$key.$k", $v, $h) if $k =~ /^[^[:punct:]]/;
         }
     }
-    return \%ctx;
+    else {
+        $h->{$key} = $val;
+    }
 }
 
 sub path {
@@ -294,6 +312,13 @@ sub repeat      { $_[0]->{'repeat'}      }
 
 sub dir         { $_[0]->{'_dir'}        }
 sub source      { $_[0]->{'_source'}     }
+
+sub channel {
+    my ($self, $chan) = @_;
+    my ($channel) = grep { $_->id eq $chan } $self->channels;
+    die "No such channel: $chan" if !defined $channel;
+    return $channel;
+}
 
 sub channels {
     my $self = shift;
