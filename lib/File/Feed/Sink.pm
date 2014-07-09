@@ -24,11 +24,13 @@ sub new {
     $cls .= '::' . lc $scheme;
     eval "use $cls; 1" or die $@;
     bless {
+        %arg,
         'uri'  => $uri,
     }, $cls;
 }
 
 sub uri { $_[0]->{'uri'} }
+sub from { $_[0]->{'from'} }
 sub host { $_[0]->{'host'} ||= $_[0]->{'uri'}->host }
 sub root { $_[0]->{'root'} ||= $_[0]->{'uri'}->path }
 sub user { $_[0]->{'user'} ||= $_[0]->{'uri'}->user }
