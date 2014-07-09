@@ -8,7 +8,7 @@ use URI;
 sub new {
     my $cls = shift;
     my %arg;
-    if (@_ == 1 && ref($_[0]) eq 'HASH') {
+    if (@_ % 2 && ref($_[0]) eq 'HASH') {
         %arg = %{ shift() };
     }
     elsif (@_ % 2) {
