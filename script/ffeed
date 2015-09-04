@@ -3,6 +3,9 @@
 use strict;
 use warnings;
 
+use FindBin;
+use lib "$FindBin::Bin/../lib/perl5lib";
+
 use File::Feed;
 use File::Kvpar;
 use Getopt::Long
@@ -17,6 +20,14 @@ $code->();
 sub cmd_create {
     my %opt;
     die "Not yet implemented";
+}
+
+sub cmd_channels {
+    #> channels [FEED]
+    #.
+    my $dir = @ARGV ? shift @ARGV : '.';
+    my $feed = File::Feed->new($dir);
+    print $_, "\n" for sort map { $_->id } $feed->channels;
 }
 
 sub cmd_fill {
