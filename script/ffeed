@@ -102,7 +102,7 @@ sub cmd_drain {
     }
 }
 
-sub _cmd_reset {
+sub cmd_reset {
     #> reset FEED
     #.
     push @ARGV, '.' if @ARGV == 0;
