@@ -17,7 +17,7 @@ use String::Expando;
 
 use vars qw($VERSION);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 # Feed statuses
 use constant IDLE     => '@idle';
@@ -263,6 +263,11 @@ sub drain {
     $self->_cleanup;
     $self->status($ok ? IDLE : ERROR);
     return @files;
+}
+
+sub reset {
+    my ($self) = @_;
+    $self->status(IDLE, 1);
 }
 
 sub context {
