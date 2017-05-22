@@ -102,6 +102,15 @@ sub cmd_drain {
     }
 }
 
+sub _cmd_reset {
+    #> reset FEED
+    #.
+    push @ARGV, '.' if @ARGV == 0;
+    my $dir = shift @ARGV;
+    my $feed = File::Feed->new($dir);
+    $feed->reset;
+}
+
 sub _fill_or_new {
     my $method = shift;
     my (%opt, %arg);
