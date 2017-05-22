@@ -30,8 +30,9 @@ sub new {
     my ($cls, $dir) = @_;
     my $kv = File::Kvpar->new('+<', "$dir/feed.kv");
     open my $lsfh, '+>>', "$dir/files.list" or die "Can't open files.list: $!";
-    my @ls = <$lsfh>;
-    chomp @ls;
+    #seek $lsfh, 0, 0;
+    #my @ls = <$lsfh>;
+    #chomp @ls;
     my @elems = $kv->elements;
     my ($feed, $source, @etc);
     ($feed,   @etc) = grep { $_->{'@'} eq 'feed'    } @elems; die if !defined $feed   || @etc;
@@ -184,13 +185,17 @@ sub fill {
         my %mkpath;
         my $lsfh = $self->{'_lsfh'};
         foreach my $channel (@channels) {
+            my $dir  = $channel->path;
+            my $ldir = $channel->local_path;
+            for ($tmpd) {
+                my $d = "$_/$ldir";
+                mkpath $d if !$mkpath{$d}++ || !-d $d;
+            }
             my @fetched = $source->fetch(
                 'channel' => $channel,
                 'exclude' => \%logged,
                 'destination' => $tmpd,
             );
-            my $dir  = $channel->path;
-            my $ldir = $channel->local_path;
             foreach my $file (@fetched) {
                 my $path  = $file->{'path'};
                 print $lsfh $path, "\n";
@@ -271,10 +276,13 @@ sub _ctxatom {
     my ($key, $val, $h) = @_;
     return if !defined $val;
     if (ref $val) {
-        $h->{$key} = $val->{'#'} if defined $val->{'#'};
-        while (my ($k, $v) = each %$val) {
-            _ctxatom("$key.$k", $v, $h) if $k =~ /^[^[:punct:]]/;
-        }
+        eval {
+            $h->{$key} = $val->{'#'} if defined $val->{'#'};
+            while (my ($k, $v) = each %$val) {
+                _ctxatom("$key.$k", $v, $h) if $k =~ /^[^[:punct:]]/;
+            }
+            1;
+        } or $h->{$key} = $val;
     }
     else {
         $h->{$key} = $val;
