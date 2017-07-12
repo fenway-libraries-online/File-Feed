@@ -270,6 +270,16 @@ sub reset {
     $self->status(IDLE, 1);
 }
 
+sub freeze {
+    my ($self) = @_;
+    $self->status(FROZEN, 0, IDLE);
+}
+
+sub thaw {
+    my ($self) = @_;
+    $self->status(IDLE, 0, FROZEN);
+}
+
 sub context {
     my ($self, %arg) = @_;
     my %ctx;
@@ -300,13 +310,18 @@ sub path {
 }
 
 sub status {
-    my ($self, $new_status, $error_ok) = @_;
+    my ($self, $new_status, $error_ok, $old_status_must_be) = @_;
     my $dir = $self->dir;
     my ($old_status, @etc) = map { basename($_) } glob($self->path('@*'));
     die "No status set for feed $self->{'@'}" if !defined $old_status;
     die "Multiple statuses set for feed $self->{'@'}" if @etc;
     return $old_status if !defined $new_status;
-    die "Feed is frozen" if $old_status eq FROZEN;
+    if (defined $old_status_must_be) {
+        die "Feed is not ".substr($old_status_must_be,1) if $old_status ne $old_status_must_be;
+    }
+    elsif ($new_status ne IDLE) {
+        die "Feed is frozen" if $old_status eq FROZEN;
+    }
     die "Feed is in error state" if $old_status eq ERROR && !$error_ok;
     return $new_status if $old_status eq $new_status;
     rename $self->path($old_status), $self->path($new_status)
