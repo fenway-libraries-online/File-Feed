@@ -111,6 +111,24 @@ sub cmd_reset {
     $feed->reset;
 }
 
+sub cmd_freeze {
+    #> freeze FEED
+    #.
+    push @ARGV, '.' if @ARGV == 0;
+    my $dir = shift @ARGV;
+    my $feed = File::Feed->new($dir);
+    $feed->freeze;
+}
+
+sub cmd_thaw {
+    #> thaw FEED
+    #.
+    push @ARGV, '.' if @ARGV == 0;
+    my $dir = shift @ARGV;
+    my $feed = File::Feed->new($dir);
+    $feed->thaw;
+}
+
 sub _fill_or_new {
     my $method = shift;
     my (%opt, %arg);
