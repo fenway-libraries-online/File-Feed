@@ -103,7 +103,7 @@ sub cmd_drain {
 }
 
 sub cmd_reset {
-    #> reset FEED
+    #> reset [FEED]
     #.
     push @ARGV, '.' if @ARGV == 0;
     my $dir = shift @ARGV;
@@ -112,7 +112,7 @@ sub cmd_reset {
 }
 
 sub cmd_freeze {
-    #> freeze FEED
+    #> freeze [FEED]
     #.
     push @ARGV, '.' if @ARGV == 0;
     my $dir = shift @ARGV;
@@ -121,12 +121,22 @@ sub cmd_freeze {
 }
 
 sub cmd_thaw {
-    #> thaw FEED
+    #> thaw [FEED]
     #.
     push @ARGV, '.' if @ARGV == 0;
     my $dir = shift @ARGV;
     my $feed = File::Feed->new($dir);
     $feed->thaw;
+}
+
+sub cmd_status {
+    #> status [FEED]
+    #.
+    push @ARGV, '.' if @ARGV == 0;
+    my $dir = shift @ARGV;
+    my $feed = File::Feed->new($dir);
+    my $status = $feed->status;
+    print substr($status, 1), "\n";
 }
 
 sub _fill_or_new {
