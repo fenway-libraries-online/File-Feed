@@ -23,7 +23,10 @@ sub new {
     my $scheme = $uri->scheme;
     $cls .= '::' . lc $scheme;
     eval "use $cls; 1" or die $@;
-    bless {
+    # We don't call $cls->new here, because we would end up recursing
+    # infinitely -- subclasses inherit this method
+    my $self = bless {
+        %arg,
         'uri'  => $uri,
     }, $cls;
 }
