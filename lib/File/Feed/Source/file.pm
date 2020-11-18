@@ -37,7 +37,7 @@ sub list {
         _crawl($abspath, \@files);
     }
     else {
-        @files = fgrep { -f $_ } glob("$abspath/*");
+        @files = grep { -f $_ } glob("$abspath/*");
     }
     return map { substr($_, $ofs) } @files;
 }

@@ -56,6 +56,7 @@ sub fetch {
         my $from = defined $path ? "$path/$_" : $_;
         my $to = "$ldir/$_";
         next if $exclude->{$from} || !$filter->($_);
+        $from = "$root/$from" if $from !~ m{^/};  # XXX Shouldn't be necessary!
         $self->fetch_file($from, $to) or die "Can't fetch $from to $to: $!";
         push @fetched, {
             '#' => $pfx . $_,
